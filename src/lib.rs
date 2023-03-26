@@ -3,7 +3,6 @@
 use std::{collections::HashMap, time::SystemTime};
 
 use anyhow::anyhow;
-use jwt::{Claims, Token, Header};
 use reqwest::Client;
 use states::{Unauthorized, Authorized};
 
@@ -20,50 +19,35 @@ mod states {
 mod web;
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Hash, PartialOrd, Clone)]
+#[serde(untagged)]
 pub enum AuthorizationGrant {
     None,
     AccessCode {
-        client_id: String,
-        client_secret: String,
         access_code: String
     },
-    OAuthToken(String)
+    OAuthToken {
+        access_token: String,
+        refresh_token: String,
+        expires_on: u64
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Hash, PartialOrd, Clone)]
 pub struct AuthorizationInfo {
     pub grant: AuthorizationGrant,
+    pub client_id: String,
+    pub client_secret: String,
     pub subscription_key: String
 }
 
-impl AuthorizationInfo {
-    pub fn new(subscription_key: &str) -> Self {
-        Self {
-            grant: AuthorizationGrant::None,
-            subscription_key: subscription_key.to_string()
-        }
-    }
-
-    pub fn get_request_token(&self) -> anyhow::Result<String> {
-        if let AuthorizationGrant::OAuthToken(ref jwt) = self.grant {
-            let token: Token<Header, Claims, _> = jwt::Token::parse_unverified(jwt)?;
-            let claims = token.claims();
-            let expiration_date = claims.registered.expiration.ok_or(anyhow!("Missing token expiration date"))?;
-            let access_token = claims.private.get("access_token").ok_or(anyhow!("Missing access token"))?.to_string();
-            if expiration_date > SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs() {
-                return Ok(access_token);
+impl AuthorizationGrant {
+    pub fn request_token(&self) -> anyhow::Result<String> {
+        if let AuthorizationGrant::OAuthToken { access_token, expires_on, .. } = self {
+            if *expires_on > SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs() {
+                return Ok(access_token.clone());
             }
         }
         Err(anyhow!("No valid request token found"))
-    }
-
-    pub fn get_refresh_token(&self) -> anyhow::Result<String> {
-        if let AuthorizationGrant::OAuthToken(ref jwt) = self.grant {
-            let token: Token<Header, Claims, _> = jwt::Token::parse_unverified(jwt)?;
-            let claims = token.claims();
-            return Ok(claims.private.get("refresh_token").ok_or(anyhow!("Missing access token"))?.to_string());
-        }
-        Err(anyhow!("No valid refresh token found"))
     }
 }
 
@@ -83,6 +67,52 @@ impl Default for SmartherApi<Unauthorized> {
     }
 }
 
+#[derive(Serialize, Debug, Clone, Default)]
+struct OAuthTokenRequest {
+    pub grant_type: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_secret: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refresh_token: Option<String>,
+}
+
+impl TryFrom<&AuthorizationInfo> for OAuthTokenRequest {
+    type Error = anyhow::Error;
+
+    fn try_from(info: &AuthorizationInfo) -> Result<Self, Self::Error> {
+        let grant = &info.grant;
+        let client_id = &info.client_id;
+        let client_secret = &info.client_secret;
+        match grant {
+            AuthorizationGrant::OAuthToken { ref refresh_token, .. } => {
+                Ok(OAuthTokenRequest {
+                    grant_type: "refresh_token",
+                    client_id: Some(client_id.clone()),
+                    client_secret: Some(client_secret.clone()),
+                    refresh_token: Some(refresh_token.clone()),
+                    ..Default::default()
+                })
+            },
+            AuthorizationGrant::AccessCode { ref  access_code } => {
+                Ok(OAuthTokenRequest {
+                    grant_type: "authorization_code",
+                    client_id: Some(client_id.clone()),
+                    client_secret: Some(client_secret.clone()),
+                    code: Some(access_code.clone()),
+                    ..Default::default()
+                })
+            },
+            _ => { Err(anyhow!("Unsupported grant type")) }
+        }
+    }
+}
+
+
+
 impl SmartherApi<Unauthorized> {
     #[cfg(feature = "web")]
     pub async fn authorize_oauth(self, client_id: &str, client_secret: &str, base_uri: Option<&str>, subscription_key: &str) -> anyhow::Result<SmartherApi<Authorized>> {
@@ -93,7 +123,7 @@ impl SmartherApi<Unauthorized> {
         let cross_code = uuid::Uuid::new_v4().to_string();
         let auth_state = web::AuthState {
             auth_channel: tx,
-            cross_code: cross_code.clone()
+            csrf_token: cross_code.clone()
         };
 
         let redirect_url = format!("{}/tokens", base_uri.unwrap_or("http://localhost:23784"));
@@ -120,9 +150,9 @@ impl SmartherApi<Unauthorized> {
         )?;
 
         self.authorize(AuthorizationInfo { 
+            client_id: client_id.to_string(), 
+            client_secret: client_secret.to_string(), 
             grant: AuthorizationGrant::AccessCode { 
-                client_id: client_id.to_string(), 
-                client_secret: client_secret.to_string(), 
                 access_code: auth_code
             }, 
             subscription_key: subscription_key.to_string()
@@ -130,32 +160,14 @@ impl SmartherApi<Unauthorized> {
     }
 
     async fn refresh_if_needed(&self, auth_info: &AuthorizationInfo) -> anyhow::Result<AuthorizationInfo> {
-        if auth_info.get_request_token().is_ok() {
+        if auth_info.grant.request_token().is_ok() {
             return Ok(auth_info.clone());
         }
         
-        let refresh_token = auth_info.get_refresh_token();
-        let response = match auth_info.grant {
-            AuthorizationGrant::OAuthToken(_) => {
-                self.client.get(TOKEN_URL)
-                    .query(&[
-                        ("grant_type", "refresh_token"),
-                        ("refresh_token", &refresh_token?)
-                    ])
-                    .send().await?
-            },
-            AuthorizationGrant::AccessCode { ref client_id, ref client_secret, ref  access_code } => {
-                self.client.get(TOKEN_URL)
-                    .query(&[
-                        ("grant_type", "authorization_code"),
-                        ("client_id", client_id),
-                        ("client_secret", client_secret),
-                        ("code", access_code)
-                    ])
-                    .send().await?
-            },
-            _ => { return Ok(auth_info.clone()) }
-        };
+        let refresh_request: OAuthTokenRequest = auth_info.try_into()?;
+        let response = self.client.post(TOKEN_URL)
+            .form(&refresh_request)
+            .send().await?;
 
         match response.status() {
             reqwest::StatusCode::OK => (),
@@ -163,9 +175,10 @@ impl SmartherApi<Unauthorized> {
         }
 
         let token = response.text().await?;
+        let auth_token = serde_json::from_str(&token)?;
         Ok(AuthorizationInfo {
-            grant: AuthorizationGrant::OAuthToken(token),
-            subscription_key: "test".to_string()
+            grant: auth_token,
+            ..auth_info.clone()
         })
     }
 
@@ -232,7 +245,7 @@ impl SmartherApi<Authorized> {
 
     fn auth_header(&self) -> anyhow::Result<(&'static str, String)> {
         let auth_info = self.auth_info.as_ref().ok_or(anyhow!("Client should be authorized"))?;
-        Ok(("Authorization" , format!("Bearer {}", auth_info.get_request_token()?)))
+        Ok(("Authorization" , format!("Bearer {}", auth_info.grant.request_token()?)))
     }
 
     fn subscription_header(&self) -> anyhow::Result<(&'static str, String)> {
@@ -273,5 +286,54 @@ impl SmartherApi<Authorized> {
         }
         
         Ok(response.json().await?)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{AuthorizationGrant, OAuthTokenRequest, AuthorizationInfo};
+
+    #[test]
+    fn request_access_code() {
+        let fake_info = &AuthorizationInfo {
+            grant: AuthorizationGrant::AccessCode { 
+                access_code: "secret_code".into() 
+            },
+            client_id: "test".into(), 
+            client_secret: "secret".into(),
+            subscription_key: "sub".into()
+        };
+
+        let refresh_request: OAuthTokenRequest = fake_info.try_into().unwrap();
+        assert_eq!(refresh_request.grant_type, "authorization_code");
+        assert_eq!(refresh_request.client_id, Some("test".into()));
+        assert_eq!(refresh_request.client_secret, Some("secret".into()));
+        assert_eq!(refresh_request.code, Some("secret_code".into()));
+        assert_eq!(refresh_request.refresh_token, None);
+
+        assert_eq!(serde_json::to_string_pretty(&refresh_request).unwrap(), "{\n  \"grant_type\": \"authorization_code\",\n  \"client_id\": \"test\",\n  \"client_secret\": \"secret\",\n  \"code\": \"secret_code\"\n}");
+    }
+
+    #[test]
+    fn request_refresh_token() {
+        let fake_info = &AuthorizationInfo {
+            grant: AuthorizationGrant::OAuthToken { 
+                access_token: "none".into(), 
+                refresh_token: "refresh".into(), 
+                expires_on: 0 
+            },
+            client_id: "test".into(), 
+            client_secret: "secret".into(),
+            subscription_key: "sub".into()
+        };
+
+        let refresh_request: OAuthTokenRequest = fake_info.try_into().unwrap();
+        assert_eq!(refresh_request.grant_type, "refresh_token");
+        assert_eq!(refresh_request.client_id, Some("test".into()));
+        assert_eq!(refresh_request.client_secret, Some("secret".into()));
+        assert_eq!(refresh_request.code, None);
+        assert_eq!(refresh_request.refresh_token, Some("refresh".into()));
+
+        assert_eq!(serde_json::to_string_pretty(&refresh_request).unwrap(), "{\n  \"grant_type\": \"refresh_token\",\n  \"client_id\": \"test\",\n  \"client_secret\": \"secret\",\n  \"refresh_token\": \"refresh\"\n}");
     }
 }
