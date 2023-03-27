@@ -6,7 +6,7 @@ use anyhow::anyhow;
 use reqwest::Client;
 use states::{Unauthorized, Authorized};
 
-pub const API_URL: &str = "https://api.developer.legrand.com/smarther/v2.0/";
+pub const API_URL: &str = "https://api.developer.legrand.com/smarther/v2.0";
 pub const AUTH_URL: &str = "https://partners-login.eliotbylegrand.com/authorize";
 pub const TOKEN_URL: &str = "https://partners-login.eliotbylegrand.com/token";
 
@@ -163,6 +163,8 @@ impl SmartherApi<Unauthorized> {
         if auth_info.grant.request_token().is_ok() {
             return Ok(auth_info.clone());
         }
+
+        println!("Refreshing token");
         
         let refresh_request: OAuthTokenRequest = auth_info.try_into()?;
         let response = self.client.post(TOKEN_URL)
@@ -263,7 +265,7 @@ impl SmartherApi<Authorized> {
     }
 
     pub async fn get_plants(&self) -> anyhow::Result<Plants> {
-        let response = self.client.get(format!("{}/plants", API_URL))
+        let response = self.client.get(format!("{API_URL}/plants"))
             .headers(self.smarther_headers()?)
             .send().await?;
 
@@ -276,7 +278,7 @@ impl SmartherApi<Authorized> {
     }
 
     pub async fn get_topology(&self, plant_id: &str) -> anyhow::Result<PlantDetail> {
-        let response = self.client.get(format!("{}/plants/{}/topology", API_URL, plant_id))
+        let response = self.client.get(format!("{API_URL}/plants/{plant_id}/topology"))
             .headers(self.smarther_headers()?)
             .send().await?;
 
