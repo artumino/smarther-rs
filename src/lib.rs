@@ -209,9 +209,15 @@ pub struct Plants
 pub struct Plant
 {
     pub id: String,
-    pub name: String,
+    pub name: Option<String>,
     #[serde(rename = "type")]
-    pub plant_type: String,
+    pub plant_type: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+pub struct PlantTopology
+{
+    pub plant: PlantDetail
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
@@ -228,16 +234,16 @@ pub struct Module
     pub device: String,
     pub name: String,
     pub id: String,
-    pub capabilities: Vec<ModuleCapability>
+    pub capabilities: Option<Vec<ModuleCapability>>
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct ModuleCapability
 {
-    capability: String,
+    capability: Option<String>,
 
     #[serde(flatten)]
-    pub can_do: HashMap<String, serde_json::Value>
+    pub can_do: Option<HashMap<String, serde_json::Value>>
 }
 
 impl SmartherApi<Authorized> {
@@ -269,22 +275,24 @@ impl SmartherApi<Authorized> {
             .headers(self.smarther_headers()?)
             .send().await?;
 
-        match response.status() {
+        let status = response.status();
+        match status {
             reqwest::StatusCode::OK => (),
-            _ => { return Err(anyhow::anyhow!(response.status().to_string())) }
+            _ => { return Err(anyhow::anyhow!(status.to_string())) }
         }
         
         Ok(response.json().await?)
     }
 
-    pub async fn get_topology(&self, plant_id: &str) -> anyhow::Result<PlantDetail> {
+    pub async fn get_topology(&self, plant_id: &str) -> anyhow::Result<PlantTopology> {
         let response = self.client.get(format!("{API_URL}/plants/{plant_id}/topology"))
             .headers(self.smarther_headers()?)
             .send().await?;
 
-        match response.status() {
+        let status = response.status();
+        match status {
             reqwest::StatusCode::OK => (),
-            _ => { return Err(anyhow::anyhow!(response.status().to_string())) }
+            _ => { return Err(anyhow::anyhow!(status.to_string())) }
         }
         
         Ok(response.json().await?)

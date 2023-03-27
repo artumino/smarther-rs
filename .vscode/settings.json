@@ -1,5 +1,10 @@
 {
     "rust-analyzer.cargo.features": [
      "web"
-    ]
+    ],
+    "lldb.launch.sourceLanguages": [
+        "rust"
+    ],
+    "lldb.consoleMode": "evaluate",
+    "lldb.commandCompletions": true
 }

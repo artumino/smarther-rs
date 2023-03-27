@@ -50,6 +50,9 @@ async fn main() -> anyhow::Result<()> {
     let auth_info = auth_info.expect("Missing authentication file, try to use the tokens subcommand first");
     let client = client.authorize(auth_info).await?;
 
+    let token_file_content = serde_json::to_string_pretty(&client.auth_info())?;
+    std::fs::write(auth_file, token_file_content)?;
+
     match args.command {
         Commands::GetPlants => {
             let plants = client.get_plants().await?;

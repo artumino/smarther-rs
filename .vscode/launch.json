@@ -1,0 +1,67 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'legrand-smarther-rs'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=legrand-smarther-rs"
+                ],
+                "filter": {
+                    "name": "legrand-smarther-rs",
+                    "kind": "lib"
+                }
+            },
+            "sourceLanguages": ["rust"],
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'cli'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=cli",
+                    "--package=legrand-smarther-rs",
+                    "--features=web"
+                ],
+                "filter": {
+                    "name": "cli",
+                    "kind": "example"
+                }
+            },
+            "sourceLanguages": ["rust"],
+            "args": ["plants"],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'cli'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=cli",
+                    "--package=legrand-smarther-rs"
+                ],
+                "filter": {
+                    "name": "cli",
+                    "kind": "example"
+                }
+            },
+            "sourceLanguages": ["rust"],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}
