@@ -1,15 +1,19 @@
 #[macro_use] extern crate serde;
 
-use std::{collections::HashMap, time::SystemTime};
+use std::time::SystemTime;
 
 use anyhow::anyhow;
 use reqwest::Client;
-use states::{Unauthorized, Authorized};
+use states::*;
+use model::*;
 
 pub const API_URL: &str = "https://api.developer.legrand.com/smarther/v2.0";
 pub const AUTH_URL: &str = "https://partners-login.eliotbylegrand.com/authorize";
 pub const TOKEN_URL: &str = "https://partners-login.eliotbylegrand.com/token";
 
+#[cfg(test)]
+mod test;
+mod model;
 mod states {
     pub struct Unauthorized;
     pub struct Authorized;
@@ -199,53 +203,6 @@ impl SmartherApi<Unauthorized> {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Hash, PartialOrd, Clone)]
-pub struct Plants
-{
-    pub plants: Vec<Plant>
-}
-
-#[derive(Debug, Deserialize, Serialize, PartialEq, Hash, PartialOrd, Clone)]
-pub struct Plant
-{
-    pub id: String,
-    pub name: Option<String>,
-    #[serde(rename = "type")]
-    pub plant_type: Option<String>,
-}
-
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
-pub struct PlantTopology
-{
-    pub plant: PlantDetail
-}
-
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
-pub struct PlantDetail
-{
-    pub id: String,
-    pub name: String,
-    pub modules: Vec<Module>
-}
-
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
-pub struct Module
-{
-    pub device: String,
-    pub name: String,
-    pub id: String,
-    pub capabilities: Option<Vec<ModuleCapability>>
-}
-
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
-pub struct ModuleCapability
-{
-    capability: Option<String>,
-
-    #[serde(flatten)]
-    pub can_do: Option<HashMap<String, serde_json::Value>>
-}
-
 impl SmartherApi<Authorized> {
     pub fn auth_info(&self) -> Option<&AuthorizationInfo> {
         self.auth_info.as_ref()
@@ -297,53 +254,18 @@ impl SmartherApi<Authorized> {
         
         Ok(response.json().await?)
     }
-}
 
-#[cfg(test)]
-mod test {
-    use crate::{AuthorizationGrant, OAuthTokenRequest, AuthorizationInfo};
+    pub async fn get_device_status(&self, plant_id: &str, module_id: &str) -> anyhow::Result<ModuleStatus> {
+        let response = self.client.get(format!("{API_URL}/chronothermostat/thermoregulation/addressLocation/plants/{plant_id}/modules/parameter/id/value/{module_id}"))
+            .headers(self.smarther_headers()?)
+            .send().await?;
 
-    #[test]
-    fn request_access_code() {
-        let fake_info = &AuthorizationInfo {
-            grant: AuthorizationGrant::AccessCode { 
-                access_code: "secret_code".into() 
-            },
-            client_id: "test".into(), 
-            client_secret: "secret".into(),
-            subscription_key: "sub".into()
-        };
-
-        let refresh_request: OAuthTokenRequest = fake_info.try_into().unwrap();
-        assert_eq!(refresh_request.grant_type, "authorization_code");
-        assert_eq!(refresh_request.client_id, Some("test".into()));
-        assert_eq!(refresh_request.client_secret, Some("secret".into()));
-        assert_eq!(refresh_request.code, Some("secret_code".into()));
-        assert_eq!(refresh_request.refresh_token, None);
-
-        assert_eq!(serde_json::to_string_pretty(&refresh_request).unwrap(), "{\n  \"grant_type\": \"authorization_code\",\n  \"client_id\": \"test\",\n  \"client_secret\": \"secret\",\n  \"code\": \"secret_code\"\n}");
-    }
-
-    #[test]
-    fn request_refresh_token() {
-        let fake_info = &AuthorizationInfo {
-            grant: AuthorizationGrant::OAuthToken { 
-                access_token: "none".into(), 
-                refresh_token: "refresh".into(), 
-                expires_on: 0 
-            },
-            client_id: "test".into(), 
-            client_secret: "secret".into(),
-            subscription_key: "sub".into()
-        };
-
-        let refresh_request: OAuthTokenRequest = fake_info.try_into().unwrap();
-        assert_eq!(refresh_request.grant_type, "refresh_token");
-        assert_eq!(refresh_request.client_id, Some("test".into()));
-        assert_eq!(refresh_request.client_secret, Some("secret".into()));
-        assert_eq!(refresh_request.code, None);
-        assert_eq!(refresh_request.refresh_token, Some("refresh".into()));
-
-        assert_eq!(serde_json::to_string_pretty(&refresh_request).unwrap(), "{\n  \"grant_type\": \"refresh_token\",\n  \"client_id\": \"test\",\n  \"client_secret\": \"secret\",\n  \"refresh_token\": \"refresh\"\n}");
+        let status = response.status();
+        match status {
+            reqwest::StatusCode::OK => (),
+            _ => { return Err(anyhow::anyhow!(status.to_string())) }
+        }
+        
+        Ok(response.json().await?)
     }
 }

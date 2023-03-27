@@ -23,6 +23,13 @@ enum Commands {
         #[clap(name = "PLANT_ID")]
         plant_id: String,
     },
+    #[clap(name = "status")]
+    GetStatus {
+        #[clap(name = "PLANT_ID")]
+        plant_id: String,
+        #[clap(name = "MODULE_ID")]
+        module_id: String,
+    },
 }
 
 #[tokio::main]
@@ -61,6 +68,10 @@ async fn main() -> anyhow::Result<()> {
         Commands::GetTopology { plant_id } => {
             let topology = client.get_topology(&plant_id).await?;
             println!("{:#?}", topology);
+        },
+        Commands::GetStatus { plant_id, module_id } => {
+            let status = client.get_device_status(&plant_id, &module_id).await?;
+            println!("{:#?}", status);
         },
         _ => {}
     }
