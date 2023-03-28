@@ -75,7 +75,7 @@ fn timed_measurements_are_parsed_correctly() {
     assert_eq!(
         celsius,
         TimedMeasurement {
-            time_stamp: "2020-12-01T00:00:00Z".into(),
+            time_stamp: "2020-12-01T00:00:00Z".parse().unwrap(),
             value: Measurement::Celsius(25.0)
         }
     );
@@ -83,7 +83,7 @@ fn timed_measurements_are_parsed_correctly() {
     assert_eq!(
         fahrenheit,
         TimedMeasurement {
-            time_stamp: "2020-12-01T00:00:00Z".into(),
+            time_stamp: "2020-12-01T00:00:00Z".parse().unwrap(),
             value: Measurement::Fahrenheit(77.0)
         }
     );
@@ -91,7 +91,7 @@ fn timed_measurements_are_parsed_correctly() {
     assert_eq!(
         percentage,
         TimedMeasurement {
-            time_stamp: "2020-12-01T00:00:00Z".into(),
+            time_stamp: "2020-12-01T00:00:00Z".parse().unwrap(),
             value: Measurement::Percentage(50.0)
         }
     );

@@ -13,7 +13,7 @@ pub const TOKEN_URL: &str = "https://partners-login.eliotbylegrand.com/token";
 
 #[cfg(test)]
 mod test;
-mod model;
+pub mod model;
 mod states {
     pub struct Unauthorized;
     pub struct Authorized;
@@ -263,5 +263,24 @@ impl SmartherApi<Authorized> {
         }
         
         Ok(response.json().await?)
+    }
+
+    pub async fn set_device_status(&self, plant_id: &str, module_id: &str, status: SetStatusRequest) -> anyhow::Result<()> {
+        if !status.validate() {
+            return Err(anyhow::anyhow!("Invalid status"))
+        }
+
+        let response = self.client.post(format!("{API_URL}/chronothermostat/thermoregulation/addressLocation/plants/{plant_id}/modules/parameter/id/value/{module_id}"))
+            .headers(self.smarther_headers()?)
+            .json(&status)
+            .send().await?;
+
+        let status = response.status();
+        match status {
+            reqwest::StatusCode::OK => (),
+            _ => { return Err(anyhow::anyhow!(status.to_string())) }
+        }
+        
+        Ok(())
     }
 }

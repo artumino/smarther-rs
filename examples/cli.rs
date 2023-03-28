@@ -1,4 +1,6 @@
+use chrono::Utc;
 use clap::{Subcommand, Parser};
+use legrand_smarther_rs::model::{SetStatusRequest, ThermostatMode, ThermostatFunction, Measurement, ProgramIdentifier};
 
 #[derive(Parser)]
 struct CliArgs {
@@ -29,6 +31,40 @@ enum Commands {
         plant_id: String,
         #[clap(name = "MODULE_ID")]
         module_id: String,
+    },
+    #[clap(name = "boost")]
+    Boost {
+        #[clap(name = "PLANT_ID")]
+        plant_id: String,
+        #[clap(name = "MODULE_ID")]
+        module_id: String,
+        #[clap(name = "DURATION")]
+        duration: i64,
+    },
+    #[clap(name = "off")]
+    Off {
+        #[clap(name = "PLANT_ID")]
+        plant_id: String,
+        #[clap(name = "MODULE_ID")]
+        module_id: String,
+    },
+    #[clap(name = "manual")]
+    Manual {
+        #[clap(name = "PLANT_ID")]
+        plant_id: String,
+        #[clap(name = "MODULE_ID")]
+        module_id: String,
+        #[clap(name = "TEMPERATURE")]
+        temperature: f32,
+    },
+    #[clap(name = "program")]
+    Program {
+        #[clap(name = "PLANT_ID")]
+        plant_id: String,
+        #[clap(name = "MODULE_ID")]
+        module_id: String,
+        #[clap(name = "PROGRAM_NUMBERS")]
+        program_numbers: Vec<u32>,
     },
 }
 
@@ -78,6 +114,51 @@ async fn main() -> anyhow::Result<()> {
         Commands::GetStatus { plant_id, module_id } => {
             let status = client.get_device_status(&plant_id, &module_id).await?;
             println!("{:#?}", status);
+        },
+        Commands::Boost { plant_id, module_id, duration } => {
+            let activation_time = Utc::now() + chrono::Duration::minutes(duration);
+            let request = SetStatusRequest {
+                mode: ThermostatMode::Boost,
+                function: ThermostatFunction::Heating,
+                set_point: None,
+                programs: None,
+                activation_time: Some(activation_time.format("%Y-%m-%dT%H:%M:%S").to_string()),
+            };
+            println!("{}", serde_json::to_string_pretty(&request)?);
+            client.set_device_status(&plant_id, &module_id, request).await?;
+        },
+        Commands::Off { plant_id, module_id } => {
+            let request = SetStatusRequest {
+                mode: ThermostatMode::Off,
+                function: ThermostatFunction::Heating,
+                set_point: None,
+                programs: None,
+                activation_time: None,
+            };
+            println!("{}", serde_json::to_string_pretty(&request)?);
+            client.set_device_status(&plant_id, &module_id, request).await?;
+        },
+        Commands::Manual { plant_id, module_id, temperature } => {
+            let request = SetStatusRequest {
+                mode: ThermostatMode::Manual,
+                function: ThermostatFunction::Heating,
+                set_point: Some(Measurement::Celsius(temperature)),
+                programs: None,
+                activation_time: None,
+            };
+            println!("{}", serde_json::to_string_pretty(&request)?);
+            client.set_device_status(&plant_id, &module_id, request).await?;
+        },
+        Commands::Program { plant_id, module_id, program_numbers } => {
+            let request = SetStatusRequest {
+                mode: ThermostatMode::Automatic,
+                function: ThermostatFunction::Heating,
+                set_point: None,
+                programs: Some(program_numbers.iter().map(|n| ProgramIdentifier { number: *n}).collect()),
+                activation_time: None,
+            };
+            println!("{}", serde_json::to_string_pretty(&request)?);
+            client.set_device_status(&plant_id, &module_id, request).await?;
         },
         _ => {}
     }

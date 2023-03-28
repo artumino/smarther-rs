@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use chrono::{DateTime, Utc, NaiveDateTime};
 use serde_aux::prelude::*;
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Hash, PartialOrd, Clone)]
@@ -55,10 +56,10 @@ pub struct ThermostatStatus {
     pub mode: ThermostatMode,
     pub set_point: Option<Measurement>,
     pub programs: Option<Vec<ProgramIdentifier>>,
-    pub activation_time: Option<String>,
+    pub activation_time: Option<NaiveDateTime>,
     pub temperature_format: Option<MeasurementUnit>,
     pub load_state: Option<LoadState>,
-    pub time: String,
+    pub time: DateTime<Utc>,
     pub thermometer: Option<Instrument>,
     pub hygrometer: Option<Instrument>,
     pub sender: Option<SenderInfo>,
@@ -109,7 +110,7 @@ pub struct Instrument {
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TimedMeasurement {
-    pub time_stamp: String,
+    pub time_stamp: DateTime<Utc>,
     #[serde(flatten)]
     pub value: Measurement,
 }
@@ -147,4 +148,34 @@ pub struct PlantMiniamlDetail {
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct ModuleMinimalDetail {
     pub id: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SetStatusRequest {
+    pub function: ThermostatFunction,
+    pub mode: ThermostatMode,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub set_point: Option<Measurement>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub programs: Option<Vec<ProgramIdentifier>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub activation_time: Option<String>,
+}
+
+impl SetStatusRequest {
+    pub fn validate(&self) -> bool {
+        match self.mode {
+            ThermostatMode::Manual => {
+                self.set_point.is_some()
+            }
+            ThermostatMode::Boost => {
+                self.activation_time.is_some()
+            },
+            ThermostatMode::Automatic => {
+                self.programs.is_some()
+            },
+            _ => true
+        }
+    }
 }
