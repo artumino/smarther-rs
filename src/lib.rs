@@ -53,6 +53,14 @@ impl AuthorizationGrant {
         }
         Err(anyhow!("No valid request token found"))
     }
+
+    pub fn needs_refresh(&self) -> bool {
+        if let AuthorizationGrant::OAuthToken { expires_on, .. } = self {
+            *expires_on < SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs()
+        } else {
+            true
+        }
+    }
 }
 
 pub struct SmartherApi<State> {
@@ -119,7 +127,7 @@ impl TryFrom<&AuthorizationInfo> for OAuthTokenRequest {
 
 impl SmartherApi<Unauthorized> {
     #[cfg(feature = "web")]
-    pub async fn authorize_oauth(self, client_id: &str, client_secret: &str, base_uri: Option<&str>, subscription_key: &str) -> anyhow::Result<SmartherApi<Authorized>> {
+    pub async fn get_oauth_access_code(&self, client_id: &str, client_secret: &str, base_uri: Option<&str>, subscription_key: &str) -> anyhow::Result<AuthorizationInfo> {
         use actix_web::{App, HttpServer, web::Data};
 
         let (tx, rx) = crossbeam::channel::bounded::<anyhow::Result<String>>(1);
@@ -153,23 +161,17 @@ impl SmartherApi<Unauthorized> {
             } => Err(anyhow::anyhow!("Error binding local server to port 23784"))
         )?;
 
-        self.authorize(AuthorizationInfo { 
+        Ok(AuthorizationInfo { 
             client_id: client_id.to_string(), 
             client_secret: client_secret.to_string(), 
             grant: AuthorizationGrant::AccessCode { 
                 access_code: auth_code
             }, 
             subscription_key: subscription_key.to_string()
-        }).await
+        })
     }
 
-    async fn refresh_if_needed(&self, auth_info: &AuthorizationInfo) -> anyhow::Result<AuthorizationInfo> {
-        if auth_info.grant.request_token().is_ok() {
-            return Ok(auth_info.clone());
-        }
-
-        println!("Refreshing token");
-        
+    pub async fn refresh_token(&self, auth_info: &AuthorizationInfo) -> anyhow::Result<AuthorizationInfo> {
         let refresh_request: OAuthTokenRequest = auth_info.try_into()?;
         let response = self.client.post(TOKEN_URL)
             .form(&refresh_request)
@@ -189,14 +191,12 @@ impl SmartherApi<Unauthorized> {
     }
 
     pub async fn authorize(self, auth_info: AuthorizationInfo) -> anyhow::Result<SmartherApi<Authorized>> {
-        let refreshed_token = self.refresh_if_needed(&auth_info).await?;
-
-        if refreshed_token.grant == AuthorizationGrant::None {
-            return Err(anyhow::anyhow!("Invalid authorization grant"));
+        if auth_info.grant.needs_refresh() {
+            return Err(anyhow!("Authorization needs to be refreshed"))
         }
 
         Ok(SmartherApi {
-            auth_info: Some(refreshed_token),
+            auth_info: Some(auth_info),
             client: self.client,
             state: std::marker::PhantomData,
         })
@@ -204,10 +204,6 @@ impl SmartherApi<Unauthorized> {
 }
 
 impl SmartherApi<Authorized> {
-    pub fn auth_info(&self) -> Option<&AuthorizationInfo> {
-        self.auth_info.as_ref()
-    }
-
     fn auth_header(&self) -> anyhow::Result<(&'static str, String)> {
         let auth_info = self.auth_info.as_ref().ok_or(anyhow!("Client should be authorized"))?;
         Ok(("Authorization" , format!("Bearer {}", auth_info.grant.request_token()?)))

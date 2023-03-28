@@ -47,18 +47,24 @@ async fn main() -> anyhow::Result<()> {
     };
 
     if let Commands::Tokens { client_id, client_secret, subkey } = args.command {
-        let client = client.authorize_oauth(&client_id, &client_secret, None, &subkey).await?;
-        let token_file_content = serde_json::to_string_pretty(&client.auth_info())?;
+        let access_token = client.get_oauth_access_code(&client_id, &client_secret, None, &subkey).await?;
+        let refreshed_token = client.refresh_token(&access_token).await?;
+        let token_file_content = serde_json::to_string_pretty(&refreshed_token)?;
         println!("{}", token_file_content);
         std::fs::write(auth_file, token_file_content)?;
         return Ok(());
     }
 
-    let auth_info = auth_info.expect("Missing authentication file, try to use the tokens subcommand first");
-    let client = client.authorize(auth_info).await?;
+    let mut auth_info = auth_info.expect("Missing authentication file, try to use the tokens subcommand first");
 
-    let token_file_content = serde_json::to_string_pretty(&client.auth_info())?;
-    std::fs::write(auth_file, token_file_content)?;
+    if auth_info.grant.needs_refresh() {
+        let refreshed_token = client.refresh_token(&auth_info).await?;
+        let token_file_content = serde_json::to_string_pretty(&refreshed_token)?;
+        std::fs::write(auth_file, token_file_content)?;
+        auth_info = refreshed_token;
+    }
+
+    let client = client.authorize(auth_info).await?;
 
     match args.command {
         Commands::GetPlants => {
