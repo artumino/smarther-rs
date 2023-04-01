@@ -4,6 +4,7 @@ use std::time::SystemTime;
 
 use anyhow::anyhow;
 use reqwest::Client;
+use serde_json::json;
 use states::*;
 use model::*;
 
@@ -283,4 +284,50 @@ impl SmartherApi<Authorized> {
         
         Ok(())
     }
+
+    pub async fn register_webhook(&self, plant_id: &str, endpoint_url: String) -> anyhow::Result<SubscriptionInfo> {
+        let response = self.client.post(format!("{API_URL}/plants/{plant_id}/subscription"))
+            .headers(self.smarther_headers()?)
+            .json(&json!({
+                "EndPointUrl": endpoint_url
+            }))
+            .send().await?;
+
+        let status = response.status();
+        match status {
+            reqwest::StatusCode::CREATED => (),
+            _ => { return Err(anyhow::anyhow!(status.to_string())) }
+        }
+        
+        Ok(response.json().await?)
+    }
+
+    pub async fn unregister_webhook(&self, plant_id: &str, subscription_id: &str) -> anyhow::Result<()> {
+        let response = self.client.delete(format!("{API_URL}/plants/{plant_id}/subscription/{subscription_id}"))
+            .headers(self.smarther_headers()?)
+            .send().await?;
+
+        let status = response.status();
+        match status {
+            reqwest::StatusCode::OK => (),
+            _ => { return Err(anyhow::anyhow!(status.to_string())) }
+        }
+        
+        Ok(())
+    }
+
+    pub async fn get_webhooks(&self) -> anyhow::Result<Vec<SubscriptionInfo>> {
+        let response = self.client.get(format!("{API_URL}/subscription"))
+            .headers(self.smarther_headers()?)
+            .send().await?;
+
+        let status = response.status();
+        match status {
+            reqwest::StatusCode::OK => (),
+            _ => { return Err(anyhow::anyhow!(status.to_string())) }
+        }
+        
+        Ok(response.json().await?)
+    }
+
 }

@@ -122,7 +122,7 @@ async fn main() -> anyhow::Result<()> {
                 function: ThermostatFunction::Heating,
                 set_point: None,
                 programs: None,
-                activation_time: Some(activation_time.format("%Y-%m-%dT%H:%M:%S").to_string()),
+                activation_time: Some(activation_time.format("%FT%TZ").to_string()),
             };
             println!("{}", serde_json::to_string_pretty(&request)?);
             client.set_device_status(&plant_id, &module_id, request).await?;

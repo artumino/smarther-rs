@@ -2,24 +2,25 @@
     "chronothermostats": [
         {
             "function": "HEATING",
-            "mode": "AUTOMATIC",
+            "mode": "MANUAL",
             "setPoint": {
-                "value": "18.00000",
+                "value": "19.1",
                 "unit": "C"
             },
             "programs": [
                 {
-                    "number": 1
+                    "number": "1"
                 }
             ],
+            "activationTime": "2019-11-17T02:00:47Z",
             "temperatureFormat": "C",
             "loadState": "INACTIVE",
-            "time": "2021-02-27T22:49:32+02:00",
+            "time": "2019-01-24T15:30:20Z",
             "thermometer": {
                 "measures": [
                     {
-                        "timeStamp": "2021-02-27T22:49:32+02:00",
-                        "value": "19.5",
+                        "timeStamp": "2019-01-24T15:30:19Z",
+                        "value": "24.6",
                         "unit": "C"
                     }
                 ]
@@ -27,14 +28,14 @@
             "hygrometer": {
                 "measures": [
                     {
-                        "timeStamp": "2021-02-27T22:49:32+02:00",
-                        "value": "61.9",
+                        "timeStamp": "2019-01-24T15:30:19Z",
+                        "value": "24.6",
                         "unit": "%"
                     }
                 ]
             },
             "sender": {
-                "addressType": "addressLocation",
+                "addressType": "AddressLocation",
                 "system": "thermoregulation",
                 "plant": {
                     "id": "b5e48d6f-cbad-2711-e053-27182d0ad74c",
@@ -42,6 +43,11 @@
                         "id": "1ee68d6f-46b7-8f11-e053-27182d0a846a"
                     }
                 }
+            },
+            "receiver": {
+                "oid": [
+                    "a122e653-53fb-450e-b000-d47659807585"
+                ]
             }
         }
     ]

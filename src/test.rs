@@ -103,3 +103,10 @@ fn correctly_parse_status() {
     let status: ModuleStatus = serde_json::from_str(&status_message_json).unwrap();
     assert!(status.chronothermostats.len() == 1);
 }
+
+#[test]
+fn correctly_parse_c2c_status_changes() {
+    let status_message_json = std::fs::read_to_string("validation/c2c_example.json").unwrap();
+    let status: ModuleStatus = serde_json::from_str(&status_message_json).unwrap();
+    assert!(status.chronothermostats.len() == 1);
+}

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use chrono::{DateTime, Utc, NaiveDateTime};
+use chrono::{DateTime, Utc};
 use serde_aux::prelude::*;
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Hash, PartialOrd, Clone)]
@@ -56,13 +56,14 @@ pub struct ThermostatStatus {
     pub mode: ThermostatMode,
     pub set_point: Option<Measurement>,
     pub programs: Option<Vec<ProgramIdentifier>>,
-    pub activation_time: Option<NaiveDateTime>,
+    pub activation_time: Option<DateTime<Utc>>,
     pub temperature_format: Option<MeasurementUnit>,
     pub load_state: Option<LoadState>,
     pub time: DateTime<Utc>,
     pub thermometer: Option<Instrument>,
     pub hygrometer: Option<Instrument>,
     pub sender: Option<SenderInfo>,
+    pub receiver: Option<ReceiverInfo>,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
@@ -76,6 +77,12 @@ pub struct SenderInfo {
     pub address_type: Option<String>,
     pub system: Option<String>,
     pub plant: Option<PlantMiniamlDetail>,
+}
+
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ReceiverInfo {
+    pub oid: Option<Vec<String>>
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
@@ -178,4 +185,15 @@ impl SetStatusRequest {
             _ => true
         }
     }
+}
+
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SubscriptionInfo {
+    pub subscription_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub plant_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "EndPointUrl")]
+    pub endpoint_url: Option<String>
 }
