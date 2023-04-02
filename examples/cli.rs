@@ -1,6 +1,6 @@
 use chrono::Utc;
 use clap::{Subcommand, Parser};
-use legrand_smarther_rs::model::{SetStatusRequest, ThermostatMode, ThermostatFunction, Measurement, ProgramIdentifier};
+use smarther::model::{SetStatusRequest, ThermostatMode, ThermostatFunction, Measurement, ProgramIdentifier};
 
 #[derive(Parser)]
 struct CliArgs {
@@ -71,12 +71,12 @@ enum Commands {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args = CliArgs::parse();
-    let client = legrand_smarther_rs::SmartherApi::default();
+    let client = smarther::SmartherApi::default();
     let auth_file = args.auth_file.unwrap_or_else(|| "saved_tokens.json".into());
 
     let auth_info = match std::fs::read_to_string(&auth_file) {
         Ok(content) => {
-            let auth_info: legrand_smarther_rs::AuthorizationInfo = serde_json::from_str(&content)?;
+            let auth_info: smarther::AuthorizationInfo = serde_json::from_str(&content)?;
             Some(auth_info)
         },
         Err(_) => None
