@@ -84,7 +84,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     if let Commands::Tokens { client_id, client_secret, subkey } = args.command {
-        let access_token = client.get_oauth_access_code(&client_id, &client_secret, None, &subkey).await?;
+        let access_token = client.get_oauth_access_code(&client_id, &client_secret, None, &subkey, ("localhost", 8989)).await?;
         let refreshed_token = client.refresh_token(&access_token).await?;
         let token_file_content = serde_json::to_string_pretty(&refreshed_token)?;
         info!("{}", token_file_content);

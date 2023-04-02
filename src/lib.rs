@@ -135,7 +135,7 @@ impl TryFrom<&AuthorizationInfo> for OAuthTokenRequest {
 
 impl SmartherApi<Unauthorized> {
     #[cfg(feature = "web")]
-    pub async fn get_oauth_access_code(&self, client_id: &str, client_secret: &str, base_uri: Option<&str>, subscription_key: &str) -> anyhow::Result<AuthorizationInfo> {
+    pub async fn get_oauth_access_code(&self, client_id: &str, client_secret: &str, base_uri: Option<&str>, subscription_key: &str, listen_config: (&str, u16)) -> anyhow::Result<AuthorizationInfo> {
         use actix_web::{App, HttpServer, web::Data};
         use log::info;
 
@@ -147,7 +147,9 @@ impl SmartherApi<Unauthorized> {
             csrf_token: cross_code.clone()
         };
 
-        let redirect_url = format!("{}/tokens", base_uri.unwrap_or("http://localhost:23784"));
+        let hostname = listen_config.0;
+        let port = listen_config.1;
+        let redirect_url = format!("{}/tokens", base_uri.unwrap_or(format!("http://{hostname}:{port}").as_str()));
         let auth_code = tokio::select!(
             code = async move {
                 let oauth_link = format!("{AUTH_URL}?response_type=code&client_id={client_id}&state={cross_code}&redirect_uri={redirect_url}");
@@ -163,7 +165,7 @@ impl SmartherApi<Unauthorized> {
                         .app_data(Data::new(auth_state.clone()))
                         .service(web::tokens)
                 })
-                .bind(("localhost", 23784))?
+                .bind(listen_config)?
                 .run()
                 .await
             } => Err(anyhow::anyhow!("Error binding local server to port 23784"))
