@@ -76,7 +76,7 @@ pub struct ProgramIdentifier {
 pub struct SenderInfo {
     pub address_type: Option<String>,
     pub system: Option<String>,
-    pub plant: Option<PlantMiniamlDetail>,
+    pub plant: Option<PlantMinimalDetails>,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
@@ -114,6 +114,16 @@ pub struct Instrument {
     pub measures: Option<Vec<TimedMeasurement>>,
 }
 
+impl Instrument {
+    pub fn last_measurement(&self) -> Option<&TimedMeasurement> {
+        self.measures.as_ref().and_then(|measurements| {
+            let mut sorted_set: Vec<&TimedMeasurement> = measurements.iter().collect();
+            sorted_set.sort_by(|a,b| a.time_stamp.cmp(&b.time_stamp));
+            return sorted_set.last().copied();
+        })
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TimedMeasurement {
@@ -147,7 +157,7 @@ pub enum MeasurementUnit {
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
-pub struct PlantMiniamlDetail {
+pub struct PlantMinimalDetails {
     pub id: String,
     pub module: ModuleMinimalDetail,
 }

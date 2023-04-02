@@ -1,5 +1,6 @@
 use chrono::Utc;
 use clap::{Subcommand, Parser};
+use log::info;
 use smarther::model::{SetStatusRequest, ThermostatMode, ThermostatFunction, Measurement, ProgramIdentifier};
 
 #[derive(Parser)]
@@ -86,34 +87,34 @@ async fn main() -> anyhow::Result<()> {
         let access_token = client.get_oauth_access_code(&client_id, &client_secret, None, &subkey).await?;
         let refreshed_token = client.refresh_token(&access_token).await?;
         let token_file_content = serde_json::to_string_pretty(&refreshed_token)?;
-        println!("{}", token_file_content);
+        info!("{}", token_file_content);
         std::fs::write(auth_file, token_file_content)?;
         return Ok(());
     }
 
     let mut auth_info = auth_info.expect("Missing authentication file, try to use the tokens subcommand first");
 
-    if auth_info.grant.needs_refresh() {
+    if auth_info.is_refresh_needed() {
         let refreshed_token = client.refresh_token(&auth_info).await?;
         let token_file_content = serde_json::to_string_pretty(&refreshed_token)?;
         std::fs::write(auth_file, token_file_content)?;
         auth_info = refreshed_token;
     }
 
-    let client = client.authorize(auth_info).await?;
+    let client = client.with_authorization(auth_info)?;
 
     match args.command {
         Commands::GetPlants => {
             let plants = client.get_plants().await?;
-            println!("{:#?}", plants);
+            info!("{:#?}", plants);
         },
         Commands::GetTopology { plant_id } => {
             let topology = client.get_topology(&plant_id).await?;
-            println!("{:#?}", topology);
+            info!("{:#?}", topology);
         },
         Commands::GetStatus { plant_id, module_id } => {
             let status = client.get_device_status(&plant_id, &module_id).await?;
-            println!("{:#?}", status);
+            info!("{:#?}", status);
         },
         Commands::Boost { plant_id, module_id, duration } => {
             let activation_time = Utc::now() + chrono::Duration::minutes(duration);
@@ -124,7 +125,7 @@ async fn main() -> anyhow::Result<()> {
                 programs: None,
                 activation_time: Some(activation_time.format("%FT%TZ").to_string()),
             };
-            println!("{}", serde_json::to_string_pretty(&request)?);
+            info!("{}", serde_json::to_string_pretty(&request)?);
             client.set_device_status(&plant_id, &module_id, request).await?;
         },
         Commands::Off { plant_id, module_id } => {
@@ -135,7 +136,7 @@ async fn main() -> anyhow::Result<()> {
                 programs: None,
                 activation_time: None,
             };
-            println!("{}", serde_json::to_string_pretty(&request)?);
+            info!("{}", serde_json::to_string_pretty(&request)?);
             client.set_device_status(&plant_id, &module_id, request).await?;
         },
         Commands::Manual { plant_id, module_id, temperature } => {
@@ -146,7 +147,7 @@ async fn main() -> anyhow::Result<()> {
                 programs: None,
                 activation_time: None,
             };
-            println!("{}", serde_json::to_string_pretty(&request)?);
+            info!("{}", serde_json::to_string_pretty(&request)?);
             client.set_device_status(&plant_id, &module_id, request).await?;
         },
         Commands::Program { plant_id, module_id, program_numbers } => {
@@ -157,7 +158,7 @@ async fn main() -> anyhow::Result<()> {
                 programs: Some(program_numbers.iter().map(|n| ProgramIdentifier { number: *n}).collect()),
                 activation_time: None,
             };
-            println!("{}", serde_json::to_string_pretty(&request)?);
+            info!("{}", serde_json::to_string_pretty(&request)?);
             client.set_device_status(&plant_id, &module_id, request).await?;
         },
         _ => {}

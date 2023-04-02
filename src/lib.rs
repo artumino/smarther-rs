@@ -39,10 +39,17 @@ pub enum AuthorizationGrant {
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Hash, PartialOrd, Clone)]
 pub struct AuthorizationInfo {
-    pub grant: AuthorizationGrant,
-    pub client_id: String,
-    pub client_secret: String,
-    pub subscription_key: String
+    grant: AuthorizationGrant,
+    client_id: String,
+    client_secret: String,
+    subscription_key: String
+}
+
+impl AuthorizationInfo {
+    #[inline]
+    pub fn is_refresh_needed(&self) -> bool {
+        self.grant.is_refresh_needed()
+    }
 }
 
 impl AuthorizationGrant {
@@ -55,7 +62,7 @@ impl AuthorizationGrant {
         Err(anyhow!("No valid request token found"))
     }
 
-    pub fn needs_refresh(&self) -> bool {
+    pub fn is_refresh_needed(&self) -> bool {
         if let AuthorizationGrant::OAuthToken { expires_on, .. } = self {
             *expires_on < SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs()
         } else {
@@ -130,8 +137,9 @@ impl SmartherApi<Unauthorized> {
     #[cfg(feature = "web")]
     pub async fn get_oauth_access_code(&self, client_id: &str, client_secret: &str, base_uri: Option<&str>, subscription_key: &str) -> anyhow::Result<AuthorizationInfo> {
         use actix_web::{App, HttpServer, web::Data};
+        use log::info;
 
-        let (tx, rx) = crossbeam::channel::bounded::<anyhow::Result<String>>(1);
+        let (tx, rx) = async_channel::bounded::<anyhow::Result<String>>(1);
 
         let cross_code = uuid::Uuid::new_v4().to_string();
         let auth_state = web::AuthState {
@@ -143,16 +151,11 @@ impl SmartherApi<Unauthorized> {
         let auth_code = tokio::select!(
             code = async move {
                 let oauth_link = format!("{AUTH_URL}?response_type=code&client_id={client_id}&state={cross_code}&redirect_uri={redirect_url}");
-                println!("Please open the following link in your browser: {}", &oauth_link);
+                info!("Please open the following link in your browser: {}", &oauth_link);
                 if open::that(&oauth_link).is_err() {
-                    println!("Failed to open browser, please open the link manually");
+                    info!("Failed to open browser, please open the link manually");
                 }
-
-                let code = tokio::task::spawn_blocking(move || {
-                    rx.recv().unwrap()
-                }).await;
-                code?
-
+                rx.recv().await?
             } => code,
             _ = async move {
                 HttpServer::new(move || {
@@ -195,8 +198,8 @@ impl SmartherApi<Unauthorized> {
         })
     }
 
-    pub async fn authorize(self, auth_info: AuthorizationInfo) -> anyhow::Result<SmartherApi<Authorized>> {
-        if auth_info.grant.needs_refresh() {
+    pub fn with_authorization(self, auth_info: AuthorizationInfo) -> anyhow::Result<SmartherApi<Authorized>> {
+        if auth_info.grant.is_refresh_needed() {
             return Err(anyhow!("Authorization needs to be refreshed"))
         }
 

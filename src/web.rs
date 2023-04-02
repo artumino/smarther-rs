@@ -1,5 +1,5 @@
 use actix_web::{get, web::{Data, Query}};
-use crossbeam::channel::Sender;
+use async_channel::Sender;
 
 #[derive(Debug, Clone)]
 pub struct AuthState {
@@ -35,10 +35,10 @@ async fn extract_tokens(auth_info: &AuthenticationResponse, csrf_token: &String,
     };
     
     if result.is_ok() {
-        auth_channel.send(result).unwrap();
+        auth_channel.send(result).await.unwrap();
         "Authorized! You can close this window now."
     } else {
-        auth_channel.send(Err(anyhow::anyhow!("Error during authorization"))).unwrap();
+        auth_channel.send(Err(anyhow::anyhow!("Error during authorization"))).await.unwrap();
         "Error during authorization"
     }
 }
@@ -49,7 +49,7 @@ mod test {
 
     #[tokio::test]
     async fn token_works() -> anyhow::Result<()> {
-        use crossbeam::channel::bounded;
+        use async_channel::bounded;
 
         let (tx, rx) = bounded::<anyhow::Result<String>>(1);
         let token_code: String = "test_token".into();
@@ -63,7 +63,7 @@ mod test {
             &tx)
             .await;
 
-        let received = rx.recv().unwrap();
+        let received = rx.recv().await.unwrap();
         assert_eq!(result, "Authorized! You can close this window now.");
         assert!(received.is_ok());
 
