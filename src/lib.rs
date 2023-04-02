@@ -142,7 +142,10 @@ impl SmartherApi<Unauthorized> {
         let redirect_url = format!("{}/tokens", base_uri.unwrap_or("http://localhost:23784"));
         let auth_code = tokio::select!(
             code = async move {
-                open::that(format!("{AUTH_URL}?response_type=code&client_id={client_id}&state={cross_code}&redirect_uri={redirect_url}")).unwrap();
+                let oauth_link = format!("{AUTH_URL}?response_type=code&client_id={client_id}&state={cross_code}&redirect_uri={redirect_url}");
+                if open::that(&oauth_link).is_err() {
+                    println!("Please open the following link in your browser: {}", &oauth_link);
+                }
 
                 let code = tokio::task::spawn_blocking(move || {
                     rx.recv().unwrap()
