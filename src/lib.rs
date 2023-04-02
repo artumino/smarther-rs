@@ -15,7 +15,7 @@ pub const TOKEN_URL: &str = "https://partners-login.eliotbylegrand.com/token";
 #[cfg(test)]
 mod test;
 pub mod model;
-mod states {
+pub mod states {
     pub struct Unauthorized;
     pub struct Authorized;
 }
