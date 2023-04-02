@@ -1,6 +1,6 @@
 use chrono::Utc;
 use clap::{Subcommand, Parser};
-use log::{info, Level};
+use log::info;
 use smarther::model::{SetStatusRequest, ThermostatMode, ThermostatFunction, Measurement, ProgramIdentifier};
 
 #[derive(Parser)]
@@ -71,7 +71,6 @@ enum Commands {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    console_log::init_with_level(Level::Info).unwrap();
     let args = CliArgs::parse();
     let client = smarther::SmartherApi::default();
     let auth_file = args.auth_file.unwrap_or_else(|| "saved_tokens.json".into());
