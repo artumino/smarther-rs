@@ -110,3 +110,11 @@ fn correctly_parse_c2c_status_changes() {
     let status: ModuleStatus = serde_json::from_str(&status_message_json).unwrap();
     assert!(status.chronothermostats.len() == 1);
 }
+
+#[test]
+fn correctly_parse_c2c_events() {
+    let event_message_json = std::fs::read_to_string("validation/c2c_event.json").unwrap();
+    let events: C2CEvents = serde_json::from_str(&event_message_json).unwrap();
+    assert!(events.len() == 1);
+    assert!(events[0].data.chronothermostats.len() == 1);
+}

@@ -1,0 +1,65 @@
+[
+    {
+        "id": "495def51-34ad-aa94-9fff-24562f3eb5cc",
+        "eventType": "DeviceToCloud",
+        "subject": "///bs_cloud_b5e48d6f-cbad-2711-e053-27182d0ad74c//",
+        "eventTime": "2021-01-05T17:53:22Z",
+        "data": {
+            "chronothermostats": [
+                {
+                    "function": "HEATING",
+                    "mode": "AUTOMATIC",
+                    "setPoint": {
+                        "value": "19.00000",
+                        "unit": "C"
+                    },
+                    "programs": [
+                        {
+                            "number": "1"
+                        }
+                    ],
+                    "temperatureFormat": "C",
+                    "loadState": "INACTIVE",
+                    "time": "2021-01-05T17:53:23+00:00",
+                    "thermometer": {
+                        "measures": [
+                            {
+                                "timeStamp": "2021-01-05T17:53:22+00:00",
+                                "value": "20",
+                                "unit": "C"
+                            }
+                        ]
+                    },
+                    "hygrometer": {
+                        "measures": [
+                            {
+                                "timeStamp": "2021-01-05T17:53:22+00:00",
+                                "value": "60.0",
+                                "unit": "%"
+                            }
+                        ]
+                    },
+                    "online": false,
+                    "sender": {
+                        "addressType": "AddressLocation",
+                        "system": "thermoregulation",
+                        "plant": {
+                            "id": "b5e48d6f-cbad-2711-e053-27182d0ad74c",
+                            "module": {
+                                "id": "1ee68d6f-46b7-8f11-e053-27182d0a846a"
+                            }
+                        }
+                    },
+                    "receiver": {
+                        "oid": [
+                            "a122e653-53fb-450e-b000-d47659807585"
+                        ]
+                    }
+                }
+            ]
+        },
+        "subjectElements": {
+            "plantId": "bs_cloud_b5e48d6f-cbad-2711-e053-27182d0ad74c"
+        }
+    }
+]

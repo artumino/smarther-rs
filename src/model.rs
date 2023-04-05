@@ -207,3 +207,17 @@ pub struct SubscriptionInfo {
     #[serde(rename = "EndPointUrl")]
     pub endpoint_url: Option<String>
 }
+
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct C2CEvent {
+    pub id: String,
+    pub event_type: String,
+    pub subject: String,
+    pub event_time: DateTime<Utc>,
+    pub data: ModuleStatus,
+    #[serde(flatten)]
+    pub subject_elements: Option<HashMap<String, serde_json::Value>>
+}
+
+pub type C2CEvents = Vec<C2CEvent>;
